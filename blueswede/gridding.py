@@ -120,7 +120,6 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
             # if path is a filename, create it as is
             netcdf_path = nc_file
 
-    print(netcdf_path)
     output_netcdf, _var_list = _initialize_netcdf(
         netcdf_path,
         coordinates=("time", "northing", "easting"),

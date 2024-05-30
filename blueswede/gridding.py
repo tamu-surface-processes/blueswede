@@ -21,8 +21,23 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
 
     Parameters
     ----------
-    sww_file
+    sww_file : str
         File to grid.
+
+    nc_file : str, optional
+        File to output. If not provided, default is to output a netcdf file in
+        the same folder as `sww_file` and with the same basename.
+
+    nc_description : str, optional
+        Description entered into NetCDF "description" field. Useful to attach
+        some high-level metadata about ANUGA simulation.
+
+    dx : float, optional
+        Grid spacing for NetCDF file. Default is 10 m.
+
+    knn : int, optional
+        Nunmber of neighbors to use for k-nearest neighbors interpolation.
+        Default is 3.
 
     Examples
     --------
@@ -92,8 +107,21 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
         return gridded_data
 
     # initialize the netcdf
-    netcdf_path = os.path.join("..", "outputs", filename + ".nc")
-    output_netcdf, _var_list = initialize_netcdf(
+    if nc_file is None:
+        # if nothing provided, place it in the same place with the same name
+        netcdf_path = os.path.join("..", filename + ".nc")
+    else:
+        # otherwise, set the output nc file according to the input path
+        if nc_file[-1] == os.path.sep or os.path.isdir(nc_file):
+            # if path is a folder, place it in that folder with the same name
+            #   warning: this is not robust to a directory that does not already exist!
+            netcdf_path = os.path.join(nc_file, filename + ".nc")
+        else:
+            # if path is a filename, create it as is
+            netcdf_path = nc_file
+
+    print(netcdf_path)
+    output_netcdf, _var_list = _initialize_netcdf(
         netcdf_path,
         coordinates=("time", "northing", "easting"),
         dimensions=(nt, ny, nx),
@@ -120,7 +148,9 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
             output_netcdf[_var][t, :, :] = _grid
 
 
-def _initialize_netcdf(netcdf_path, coordinates, dimensions, clobber_netcdf=True):
+def _initialize_netcdf(
+    netcdf_path, coordinates, dimensions, description=None, clobber_netcdf=True
+):
     """
     path :
         Path to output file
@@ -155,7 +185,8 @@ def _initialize_netcdf(netcdf_path, coordinates, dimensions, clobber_netcdf=True
 
     output_netcdf = Dataset(netcdf_path, "w", format="NETCDF4")
 
-    output_netcdf.description = "McBride Canyon rainfall simulation 8mm/hr for 4hr"
+    if description:
+        output_netcdf.description = description
     output_netcdf.history = "Created " + time_lib.ctime(time_lib.time())
     output_netcdf.source = "ANUGA simulation output, gridded"
 
@@ -191,8 +222,6 @@ def _initialize_netcdf(netcdf_path, coordinates, dimensions, clobber_netcdf=True
     _var_list["xmomentum"] = ["xmomentum", "meters", "f4", _netcdf_coords]
     _var_list["ymomentum"] = ["ymomentum", "meters", "f4", _netcdf_coords]
 
-    # _var_list = list(_var_list.keys())
-    # _var_list.remove("meta")
     for _val in _var_list.keys():
         _create_grid_variable(
             _val,
@@ -205,7 +234,7 @@ def _initialize_netcdf(netcdf_path, coordinates, dimensions, clobber_netcdf=True
 
 
 if __name__ == "__main__":
-    # test for a sinlge file
+    # test for a single file
 
     import argparse
 

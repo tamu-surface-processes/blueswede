@@ -109,7 +109,8 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
     # initialize the netcdf
     if nc_file is None:
         # if nothing provided, place it in the same place with the same name
-        netcdf_path = os.path.join("..", filename + ".nc")
+        sww_folder = os.path.dirname(sww_file)
+        netcdf_path = os.path.join(sww_folder, filename + ".nc")
     else:
         # otherwise, set the output nc file according to the input path
         if nc_file[-1] == os.path.sep or os.path.isdir(nc_file):

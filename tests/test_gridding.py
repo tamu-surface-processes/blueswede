@@ -8,6 +8,7 @@ from pathlib import Path
 import unittest.mock as mock
 
 import os
+import shutil
 
 from blueswede import gridding
 
@@ -23,6 +24,21 @@ def test_path(request):
 
 
 class Test_files_folders:
+    def test_output_none(self, tmp_path: Path, test_path) -> None:
+        """Test from the sample data, processing into a dataset."""
+        # set up the paths and copy the test data to the temp folder
+        sample_data_path = test_path.joinpath("test_data", "channel3.sww")
+        _output_path = os.path.join(tmp_path)  # where we will look for the file
+        shutil.copy(sample_data_path, _output_path)
+        new_sample_data_path = os.path.join(_output_path, "channel3.sww")
+        assert os.path.exists(os.path.join(_output_path, "channel3.sww"))
+
+        # run the gridding
+        gridding.grid_sww_to_netcdf(sww_file=new_sample_data_path)
+
+        # check the output
+        assert os.path.exists(os.path.join(_output_path, "channel3.nc"))
+
     def test_output_folder(self, tmp_path: Path, test_path) -> None:
         """Test from the sample data, processing into a dataset."""
         # set up the paths

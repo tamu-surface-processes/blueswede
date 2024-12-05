@@ -103,7 +103,7 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
             denom += nn_wts[:, i]
             num += data[nn_inds[:, i]].astype(float) * nn_wts[:, i]
         gridded_data = num / denom
-        gridded_data.shape = (len(yvect), len(xvect))
+        gridded_data.shape = (len(yvect), len(xvect))  # reshape (?)
         return gridded_data
 
     # initialize the netcdf
@@ -125,6 +125,7 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
         netcdf_path,
         coordinates=("time", "northing", "easting"),
         dimensions=(nt, ny, nx),
+        description=nc_description,
         clobber_netcdf=True,
     )
 

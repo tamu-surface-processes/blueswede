@@ -34,6 +34,12 @@ def read_polygon(
     file : str
         Path to csv file to process.
 
+    id_col : str
+        Which column to part multipart polygons and polylines on. For MMQGIS
+        plugin, this is either "shapeid" or "partid", but may be different
+        for differnet CSV exporting plugins or different GIS software.
+        Default is "shapeid".
+
     keep_col : list
         Which columns to keep for the x-y points, as a list. Default is `
         ["x", "y"]`.
@@ -85,10 +91,23 @@ def read_polygon(
         # validate using the ANUGA tools for complex geometry
         if is_complex(polygon, closed, verbose=verbose):
             # error message taken from ANUGA read_polygon file
-            msg = "ERROR: Self-intersecting polygon detected in file "
-            msg += filename + ". A complex polygon will not "
-            msg += "necessarily break the algorithms within ANUGA, but it"
+            msg = "\nERROR: Self-intersecting polygon detected in file "
+            msg += file + ". A complex polygon will not "
+            msg += "necessarily break the algorithms within ANUGA, but it "
             msg += "usually signifies pathological data. Please fix this file."
+
+            # try to be helpful here and see if possibly the wrong column
+            #   for "id_col" was given
+            dropped_f = f[f.columns.difference(keep_col)]
+            not_id_col = dropped_f[dropped_f.columns.difference([id_col])]
+            unique_per_dropped = dropped_f.apply(lambda col: len(col.unique()))
+            if np.any(unique_per_dropped > unique_per_dropped[id_col]):
+                msg += "\n\nAlso, a dropped column from the input file had more unique "
+                msg += "values than the column given as `id_col`; please check that "
+                msg += "the column given is the correct column to use for parting "
+                msg += "the input file. Also, check that `closed` is "
+                msg += "properly specified."
+
             raise Exception(msg)
 
         return polygon

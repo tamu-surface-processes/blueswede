@@ -16,7 +16,9 @@ import os
 import warnings
 
 
-def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3):
+def grid_sww_to_netcdf(
+    sww_file, nc_file=None, nc_description=None, dx=10, knn=3, xy=(), mask=False
+):
     """Grid an output (merged) sww file into a netcdf.
 
     Parameters
@@ -39,13 +41,23 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
         Nunmber of neighbors to use for k-nearest neighbors interpolation.
         Default is 3.
 
+    xy : tuple, optional
+        Two-tuple of paired coordinates defining the grid for interpolation.
+
+    mask : bool or float, optional
+        Whether to mask out areas in the gridded data that are not covered by
+        the input .sww file. Default is False, which fills all locations in
+        the gridded output with interpolated data. To enable masking, specify
+        the distance to limit interpolation; this is typically a small
+        multiple of the grid spacing.
+
     Examples
     --------
 
     .. code::
 
         from blueswede.gridding import grid_sww_to_netcdf
-        grid_sww_to_netcdf("/scratch/users", nc_file=None, nc_description=None, dx=10, knn=3)
+        grid_sww_to_netcdf("/scratch/users/netid/output.sww")
     """
     filename = os.path.splitext(os.path.basename(sww_file))[0]
 
@@ -62,30 +74,52 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
     t = swwDict["time"][:].data.astype(float)
     nt = len(t)
 
-    xllcorner = float(swwDict.xllcorner)
-    yllcorner = float(swwDict.yllcorner)
-
     cellsize = dx  # need to sanitize this to be evenly divisble or anything?
 
-    # Get some dimensions and make x,y grid
-    nx = int(np.ceil((max(x) - min(x)) / cellsize) + 1)
-    xvect = np.linspace(min(x), min(x) + cellsize * (nx - 1), nx)
-    xvect_proj = np.linspace(
-        xllcorner + min(x), xllcorner + min(x) + cellsize * (nx - 1), nx
-    )  # projected
-    ny = int(np.ceil((max(y) - min(y)) / cellsize) + 1)
-    yvect = np.linspace(min(y), min(y) + cellsize * (ny - 1), ny)
-    yvect_proj = np.linspace(
-        yllcorner + min(y), yllcorner + min(y) + cellsize * (ny - 1), ny
-    )  # projected
+    ## PREPARE DATA FOR INTERPOLATION
+    inputXY = np.array([x[:], y[:]]).transpose()  # the inputs points from the sww file
+    xllcorner = float(swwDict.xllcorner)
+    yllcorner = float(swwDict.yllcorner)
+    # now, handle the xy argument
+    if len(xy) == 0:
+        ## no xy points given infer from the sww file
+
+        # Get some dimensions and make x,y grid
+        nx = int(np.ceil((max(x) - min(x)) / cellsize) + 1)
+        xvect = np.linspace(min(x), min(x) + cellsize * (nx - 1), nx)
+        xvect_proj = np.linspace(
+            xllcorner + min(x), xllcorner + min(x) + cellsize * (nx - 1), nx
+        )  # projected
+        ny = int(np.ceil((max(y) - min(y)) / cellsize) + 1)
+        yvect = np.linspace(min(y), min(y) + cellsize * (ny - 1), ny)
+        yvect_proj = np.linspace(
+            yllcorner + min(y), yllcorner + min(y) + cellsize * (ny - 1), ny
+        )  # projected
+
+    else:
+        # assume xy points are properly formatted
+        xvect_proj, yvect_proj = xy[0] - xllcorner, xy[1] - yllcorner
+        nx = len(xvect_proj)
+        ny = len(yvect_proj)
+        # xvect = xvect_proj[:-1] + (
+        #     (xvect_proj[1:] - xvect_proj[:-1]) / 2
+        # )  # midpoints in x
+        # yvect = yvect_proj[:-1] + (
+        #     (yvect_proj[1:] - yvect_proj[:-1]) / 2
+        # )  # midpoints in y
+        xvect = xvect_proj
+        yvect = yvect_proj
+    # now process to a grid for interpolation
     gridX, gridY = np.meshgrid(xvect, yvect)
     gridX_proj, gridY_proj = np.meshgrid(
         xvect_proj, (yvect_proj)
     )  # coords for netcdf and display
-
-    inputXY = np.array([x[:], y[:]]).transpose()
     gridXY_array = np.array([np.concatenate(gridX), np.concatenate(gridY)]).transpose()
     gridXY_array = np.ascontiguousarray(gridXY_array)
+    # sanity checks after processing...
+    assert gridXY_array.shape[1] == 2  # 2 columns
+    assert gridXY_array.shape[0] >= 1  # at least 1 row
+    assert gridXY_array.ndim == 2  # at least 1 row
 
     # Inverse-distance interpolation
     index_qFun = spatial.cKDTree(inputXY)
@@ -93,6 +127,18 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
     # Weights for interpolation
     nn_wts = 1.0 / (NNInfo[0] + 1.0e-100)
     nn_inds = NNInfo[1]
+
+    if mask:
+        # another query to find locations that are outside 1 cell size from
+        # any point(this is used for masking)
+        dists, _ = index_qFun.query(
+            gridXY_array,
+            k=knn,
+            distance_upper_bound=mask,
+        )  # dists is np.inf where outside distance
+        mask_flat = np.where(np.logical_not(np.any(np.isfinite(dists), axis=1)))[
+            0
+        ]  # inds of array to mask
 
     def _interp_func(data):
         if isinstance(data, list):
@@ -103,6 +149,8 @@ def grid_sww_to_netcdf(sww_file, nc_file=None, nc_description=None, dx=10, knn=3
             denom += nn_wts[:, i]
             num += data[nn_inds[:, i]].astype(float) * nn_wts[:, i]
         gridded_data = num / denom
+        if mask:
+            gridded_data.flat[mask_flat] = np.nan
         gridded_data.shape = (len(yvect), len(xvect))  # reshape (?)
         return gridded_data
 

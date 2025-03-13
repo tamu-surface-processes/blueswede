@@ -1,6 +1,6 @@
 [project]
 name = "blueswede"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 description = "Utilities for working with ANUGA."
 keywords = []
 authors = [
@@ -61,7 +61,7 @@ file = "README.rst"
 content-type = "text/x-rst"
 
 [tool.setuptools.dynamic.version]
-attr = "pyDeltaRCM._version.__version__"
+attr = "blueswede._version._version"
 
 [tool.setuptools.packages.find]
 where = [
@@ -84,6 +84,7 @@ norecursedirs = [
     "*.egg*",
     "build",
     "dist",
+    "test_data"
 ]
 addopts = [
     "--ignore=setup.py",

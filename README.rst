@@ -5,6 +5,7 @@ Blueswede
 Blueswede is a simple utility for working with ANUGA simulations.
 
 .. image:: /private/blueswede.png
+    :width: 400
 
 Disclaimer
 ----------

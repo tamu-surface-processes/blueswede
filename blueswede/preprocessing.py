@@ -151,7 +151,6 @@ def raster_to_xyz(file):
     src = rasterio.open(file)
     topo = src.read().squeeze()  # 2d array of topo
     topo_long = topo.flatten()
-    breakpoint()
     l, b, r, t = src.bounds  # bounding box of image
     res = src.res  # resolution of image
     meshX, meshY = np.meshgrid(

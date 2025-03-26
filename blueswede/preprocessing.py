@@ -148,8 +148,7 @@ def raster_to_xyz(file):
     There are many available functions to do this, but this works to get
     things into the ANUGA format, so why not rewrite it?!
     """
-    topography_file = os.path.join(data_dir, file)
-    src = rasterio.open(topography_file)
+    src = rasterio.open(file)
     topo = src.read().squeeze()  # 2d array of topo
     topo_long = topo.flatten()
     l, b, r, t = src.bounds  # bounding box of image
@@ -161,3 +160,77 @@ def raster_to_xyz(file):
     Y = np.array(meshY.flatten())
     topo_xyz = np.column_stack((X, Y, topo_long))
     return topo_xyz
+
+
+def nlcd_to_friction(geotiff_path, default_n=0.05):
+    """
+    Loads a GeoTIFF of land use data, converts NLCD codes to Manning's n values,
+    and returns a list of (x, y, friction) points.
+
+    Args:
+        geotiff_path (str): Path to the GeoTIFF file.
+
+    Returns:
+        list: A list of tuples, where each tuple is (x, y, friction).
+
+    # this function was written with the help of AI.
+    """
+
+    # Manning's n values from table
+    manning_n_values = {
+        21: 0.0404,
+        22: 0.0678,
+        23: 0.0678,
+        24: 0.0404,
+        31: 0.0113,
+        41: 0.36,
+        42: 0.32,
+        43: 0.40,
+        52: 0.40,
+        71: 0.368,
+        81: 0.325,
+        90: 0.086,
+        95: 0.1825,
+    }
+
+    # Open the GeoTIFF
+    with rasterio.open(geotiff_path) as src:
+        # Read the raster data
+        land_cover_data = src.read(
+            1
+        )  # Assuming the land cover data is in the first band
+
+        # Get the affine transformation (geotransform)
+        transform = src.transform
+
+    # Get the dimensions of the raster
+    rows, cols = land_cover_data.shape
+
+    # # Create lists to store x, y coordinates and friction values
+    x_coords = []
+    y_coords = []
+    friction_values = []
+
+    # Iterate through the raster data
+    for row in range(rows):
+        for col in range(cols):
+            # Get the NLCD code
+            nlcd_code = land_cover_data[row, col]
+
+            # Convert NLCD code to Manning's n
+            friction = manning_n_values.get(
+                nlcd_code, default_n
+            )  # Use default n if code not found
+
+            # Calculate x and y coordinates from row and column indices
+            x, y = transform * (col, row)
+
+            # Append the data to the lists
+            x_coords.append(x)
+            y_coords.append(y)
+            friction_values.append(friction)
+
+    # # Combine the data into a list of tuples
+    xyf = np.array(list(zip(x_coords, y_coords, friction_values)))
+
+    return xyf

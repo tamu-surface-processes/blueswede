@@ -13,9 +13,39 @@ import os
 
 import warnings
 
-import shared
+from . import shared
 
 import matplotlib.tri as tri
+
+
+class Domain_plotter(object):
+    def __init__(self, domain):
+        self.nodes = domain.nodes
+        self.triangles = domain.triangles
+        self.x = domain.nodes[:, 0]
+        self.y = domain.nodes[:, 1]
+
+        self.xc = domain.centroid_coordinates[:, 0]
+        self.yc = domain.centroid_coordinates[:, 1]
+
+        self.xllcorner = domain.geo_reference.xllcorner
+        self.yllcorner = domain.geo_reference.yllcorner
+        self.zone = domain.geo_reference.zone
+
+        self.triang = tri.Triangulation(self.x, self.y, self.triangles)
+
+        self.elev = domain.quantities["elevation"].centroid_values
+
+        self.domain = domain
+
+    def _plot_quantity(self, quantity):
+        q = self.domain.quantities[quantity].centroid_values
+
+        fig, ax = plt.subplots()
+        # self.triang.set_mask(self.depth > md)
+        im = plt.tripcolor(self.triang, facecolors=q, cmap="plasma")
+        fig.colorbar(im, shrink=0.5)
+        plt.show()
 
 
 class InteractiveInspector(object):

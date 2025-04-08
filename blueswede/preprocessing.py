@@ -148,11 +148,11 @@ def raster_to_xyz(file):
     There are many available functions to do this, but this works to get
     things into the ANUGA format, so why not rewrite it?!
     """
-    src = rasterio.open(file)
-    topo = src.read().squeeze()  # 2d array of topo
-    topo_long = topo.flatten()
-    l, b, r, t = src.bounds  # bounding box of image
-    res = src.res  # resolution of image
+    with rasterio.open(file) as src:
+        topo = src.read().squeeze()  # 2d array of topo
+        topo_long = topo.flatten()
+        l, b, r, t = src.bounds  # bounding box of image
+        res = src.res  # resolution of image
     meshX, meshY = np.meshgrid(
         np.arange(l, r, res[0]), np.arange(t, b, -res[0])
     )  # meshgrid of X and Y

@@ -146,8 +146,13 @@ def grid_sww_to_netcdf(
         denom = 0.0
         num = 0.0
         for i in np.arange(knn):
-            denom += nn_wts[:, i]
-            num += data[nn_inds[:, i]].astype(float) * nn_wts[:, i]
+            if knn > 1:
+                denom += nn_wts[:, i]
+                idata = data[nn_inds[:, i]].astype(float)
+                num += idata * nn_wts[:, i]
+            else:
+                denom += nn_wts[:]
+                num += data[nn_inds[:]].astype(float) * nn_wts[:]
         gridded_data = num / denom
         if mask:
             gridded_data.flat[mask_flat] = np.nan
